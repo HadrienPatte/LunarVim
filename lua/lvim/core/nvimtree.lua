@@ -129,7 +129,7 @@ function M.config()
         },
       },
       hijack_directories = {
-        enable = false,
+        enable = true,
         auto_open = true,
       },
       update_focused_file = {
