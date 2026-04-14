@@ -44,20 +44,6 @@ local function resolve_config(server_name, ...)
   return defaults
 end
 
--- manually start the server and don't wait for the usual filetype trigger from lspconfig
-local function buf_try_add(server_name, bufnr)
-  bufnr = bufnr or vim.api.nvim_get_current_buf()
-  local lspconfig_server = require("lspconfig")[server_name]
-  if lspconfig_server.manager and lspconfig_server.manager.try_add_wrapper then
-    lspconfig_server.manager:try_add_wrapper(bufnr)
-  elseif lspconfig_server.manager and lspconfig_server.manager.try_add then
-    lspconfig_server.manager:try_add(bufnr)
-  else
-    -- Trigger FileType event to let lspconfig attach
-    vim.api.nvim_exec_autocmds("FileType", { buffer = bufnr })
-  end
-end
-
 -- check if the manager autocomd has already been configured since some servers can take a while to initialize
 -- this helps guarding against a data-race condition where a server can get configured twice
 -- which seems to occur only when attaching to single-files
@@ -76,20 +62,21 @@ end
 local function launch_server(server_name, config)
   pcall(function()
     local command = config.cmd
-      or (function()
-        local ok, server_config = pcall(require, "lspconfig.configs." .. server_name)
-        if ok and server_config and server_config.default_config then
-          return server_config.default_config.cmd
-        end
-        return nil
-      end)()
+    if not command then
+      -- Try to get the default cmd from lspconfig's config files
+      local ok, server_config = pcall(require, "lspconfig.configs." .. server_name)
+      if ok and server_config and server_config.default_config then
+        command = server_config.default_config.cmd
+      end
+    end
     -- some servers have dynamic commands defined with on_new_config
     if type(command) == "table" and type(command[1]) == "string" and vim.fn.executable(command[1]) ~= 1 then
       Log:debug(string.format("[%q] is either not installed, missing from PATH, or not executable.", server_name))
       return
     end
-    require("lspconfig")[server_name].setup(config)
-    buf_try_add(server_name)
+    -- Use neovim's native LSP config API (replaces deprecated lspconfig framework)
+    vim.lsp.config(server_name, config)
+    vim.lsp.enable(server_name)
   end)
 end
 
