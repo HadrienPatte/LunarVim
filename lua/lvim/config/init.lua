@@ -60,10 +60,11 @@ function M:load(config_path)
           string.format("User-configuration not found. Creating an example configuration in %s", config_path)
         )
       end)
-      local config_name = vim.loop.os_uname().version:match "Windows" and "config_win" or "config"
+      local uv = vim.uv or vim.loop
+      local config_name = uv.os_uname().version:match "Windows" and "config_win" or "config"
       local example_config = join_paths(get_lvim_base_dir(), "utils", "installer", config_name .. ".example.lua")
       vim.fn.mkdir(user_config_dir, "p")
-      vim.loop.fs_copyfile(example_config, config_path)
+      uv.fs_copyfile(example_config, config_path)
     end
   end
 

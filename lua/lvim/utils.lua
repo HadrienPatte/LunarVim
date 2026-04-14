@@ -1,5 +1,5 @@
 local M = {}
-local uv = vim.loop
+local uv = vim.uv or vim.loop
 
 -- recursive Print (structure, limit, separator)
 local function r_inspect_settings(structure, limit, separator)
@@ -108,18 +108,18 @@ end
 ---@param source string
 ---@param destination string
 function M.fs_copy(source, destination)
-  local source_stats = assert(vim.loop.fs_stat(source))
+  local source_stats = assert(uv.fs_stat(source))
 
   if source_stats.type == "file" then
-    assert(vim.loop.fs_copyfile(source, destination))
+    assert(uv.fs_copyfile(source, destination))
     return
   elseif source_stats.type == "directory" then
-    local handle = assert(vim.loop.fs_scandir(source))
+    local handle = assert(uv.fs_scandir(source))
 
-    assert(vim.loop.fs_mkdir(destination, source_stats.mode))
+    assert(uv.fs_mkdir(destination, source_stats.mode))
 
     while true do
-      local name = vim.loop.fs_scandir_next(handle)
+      local name = uv.fs_scandir_next(handle)
       if not name then
         break
       end

@@ -81,7 +81,10 @@ local function make_client_info(client)
   local name = client.name
   local id = client.id
   local filetypes = lsp_utils.get_supported_filetypes(name)
-  local attached_buffers_list = str_list(vim.lsp.get_buffers_by_client_id(client.id))
+  local attached_buffers = vim.lsp.get_buffers_by_client_id
+    and vim.lsp.get_buffers_by_client_id(client.id)
+    or vim.tbl_keys(client.attached_buffers or {})
+  local attached_buffers_list = str_list(attached_buffers)
   local client_info = {
     fmt("* name:                      %s", name),
     fmt("* id:                        %s", tostring(id)),

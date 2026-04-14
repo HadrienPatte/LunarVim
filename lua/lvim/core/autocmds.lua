@@ -11,7 +11,8 @@ function M.load_defaults()
         pattern = "*",
         desc = "Highlight text on yank",
         callback = function()
-          vim.highlight.on_yank { higroup = "Search", timeout = 100 }
+          local hl = vim.hl or vim.highlight
+          hl.on_yank { higroup = "Search", timeout = 100 }
         end,
       },
     },

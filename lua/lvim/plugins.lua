@@ -110,8 +110,13 @@ local core_plugins = {
   },
   { "rafamadriz/friendly-snippets", lazy = true, cond = lvim.builtin.luasnip.sources.friendly_snippets },
   {
-    "folke/neodev.nvim",
-    lazy = true,
+    "folke/lazydev.nvim",
+    ft = "lua",
+    opts = {
+      library = {
+        { path = "${3rd}/luv/library", words = { "vim%.uv", "vim%.loop" } },
+      },
+    },
   },
 
   -- Autopairs
@@ -128,6 +133,7 @@ local core_plugins = {
   -- Treesitter
   {
     "nvim-treesitter/nvim-treesitter",
+    branch = "master",
     -- run = ":TSUpdate",
     config = function()
       local utils = require "lvim.utils"
@@ -325,6 +331,7 @@ local core_plugins = {
 
   {
     "lukas-reineke/indent-blankline.nvim",
+    main = "ibl",
     config = function()
       require("lvim.core.indentlines").setup()
     end,
@@ -358,28 +365,5 @@ local core_plugins = {
     event = { "FileReadPre", "BufReadPre", "User FileOpened" },
   },
 }
-
-local default_snapshot_path = join_paths(get_lvim_base_dir(), "snapshots", "default.json")
-local content = vim.fn.readfile(default_snapshot_path)
-local default_sha1 = assert(vim.fn.json_decode(content))
-
--- taken from <https://github.com/folke/lazy.nvim/blob/c7122d64cdf16766433588486adcee67571de6d0/lua/lazy/core/plugin.lua#L27>
-local get_short_name = function(long_name)
-  local name = long_name:sub(-4) == ".git" and long_name:sub(1, -5) or long_name
-  local slash = name:reverse():find("/", 1, true) --[[@as number?]]
-  return slash and name:sub(#name - slash + 2) or long_name:gsub("%W+", "_")
-end
-
-local get_default_sha1 = function(spec)
-  local short_name = get_short_name(spec[1])
-  return default_sha1[short_name] and default_sha1[short_name].commit
-end
-
-if not vim.env.LVIM_DEV_MODE then
-  --  Manually lock the commit hashes of core plugins
-  for _, spec in ipairs(core_plugins) do
-    spec["commit"] = get_default_sha1(spec)
-  end
-end
 
 return core_plugins

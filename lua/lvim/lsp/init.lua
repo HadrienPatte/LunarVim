@@ -95,8 +95,22 @@ function M.setup()
   end
 
   if lvim.use_icons then
-    for _, sign in ipairs(vim.tbl_get(vim.diagnostic.config(), "signs", "values") or {}) do
-      vim.fn.sign_define(sign.name, { texthl = sign.name, text = sign.text, numhl = sign.name })
+    local sign_values = vim.tbl_get(vim.diagnostic.config(), "signs", "values") or {}
+    local sign_text = {}
+    for _, sign in ipairs(sign_values) do
+      if sign.text and sign.name then
+        -- Use vim.diagnostic.config signs.text API (works in 0.10+)
+        local severity = sign.name:match("Hint") and vim.diagnostic.severity.HINT
+          or sign.name:match("Info") and vim.diagnostic.severity.INFO
+          or sign.name:match("Warn") and vim.diagnostic.severity.WARN
+          or sign.name:match("Error") and vim.diagnostic.severity.ERROR
+        if severity then
+          sign_text[severity] = sign.text
+        end
+      end
+    end
+    if not vim.tbl_isempty(sign_text) then
+      vim.diagnostic.config { signs = { text = sign_text } }
     end
   end
 
@@ -113,8 +127,14 @@ function M.setup()
   autocmds.configure_format_on_save()
 
   local function set_handler_opts_if_not_set(name, handler, opts)
-    if debug.getinfo(vim.lsp.handlers[name], "S").source:find(vim.env.VIMRUNTIME, 1, true) then
-      vim.lsp.handlers[name] = vim.lsp.with(handler, opts)
+    if handler and vim.lsp.handlers[name] then
+      local ok, info = pcall(debug.getinfo, vim.lsp.handlers[name], "S")
+      if ok and info and info.source and info.source:find(vim.env.VIMRUNTIME, 1, true) then
+        vim.lsp.handlers[name] = function(err, result, ctx, config)
+          config = vim.tbl_deep_extend("force", config or {}, opts)
+          return handler(err, result, ctx, config)
+        end
+      end
     end
   end
 
@@ -122,7 +142,10 @@ function M.setup()
   set_handler_opts_if_not_set("textDocument/signatureHelp", vim.lsp.handlers.signature_help, { border = "rounded" })
 
   -- Enable rounded borders in :LspInfo window.
-  require("lspconfig.ui.windows").default_options.border = "rounded"
+  local ok_ui, lspconfig_ui = pcall(require, "lspconfig.ui.windows")
+  if ok_ui and lspconfig_ui then
+    lspconfig_ui.default_options.border = "rounded"
+  end
 end
 
 return M
