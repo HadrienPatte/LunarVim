@@ -3,6 +3,18 @@ local Log = require "lvim.core.log"
 
 local has_tree_sitter_cli = nil
 
+-- Filetype aliases: when no dedicated parser exists, use a related one.
+-- Also used as vim syntax fallback when treesitter can't highlight.
+local ft_to_parser = {
+  helm = "yaml",
+  dotenv = "bash",
+  zsh = "bash",
+  keymap = "devicetree",
+  json5 = "json",
+  jsonc = "json",
+  terraform = "hcl",
+}
+
 function M.config()
   lvim.builtin.treesitter = {
     on_config_done = nil,
@@ -52,6 +64,36 @@ local function check_tree_sitter_cli()
   return has_tree_sitter_cli
 end
 
+--- Try to enable treesitter highlighting and indentation on a buffer.
+--- Returns true if treesitter highlighting was started successfully.
+local function try_enable_treesitter(buf, lang, highlight_cfg, indent_cfg, is_disabled)
+  local parser_ok = pcall(vim.treesitter.language.inspect, lang)
+  if not parser_ok then
+    return false
+  end
+
+  -- Check for bigfile disable
+  local bigfile_ok, big_file_detected = pcall(vim.api.nvim_buf_get_var, buf, "bigfile_disable_treesitter")
+  if bigfile_ok and big_file_detected then
+    return false
+  end
+
+  -- Enable highlighting
+  if highlight_cfg.enable and not is_disabled(highlight_cfg, lang, buf) then
+    local started = pcall(vim.treesitter.start, buf, lang)
+    if not started then
+      return false
+    end
+  end
+
+  -- Enable indentation
+  if indent_cfg.enable and not is_disabled(indent_cfg, lang, buf) then
+    vim.bo[buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+  end
+
+  return true
+end
+
 function M.setup()
   -- avoid running in headless mode since it's harder to detect failures
   if #vim.api.nvim_list_uis() == 0 then
@@ -82,18 +124,8 @@ function M.setup()
     end
   end
 
-  -- Register common filetype aliases so treesitter can highlight them
-  -- using a related parser (the new nvim-treesitter main branch does not
-  -- do this automatically like the old master branch did)
-  local ft_to_parser = {
-    helm = "yaml",
-    dotenv = "bash",
-    zsh = "bash",
-    keymap = "devicetree",
-    json5 = "json",
-    jsonc = "json",
-    terraform = "hcl",
-  }
+  -- Register filetype aliases so treesitter can highlight derived filetypes
+  -- (the new nvim-treesitter main branch does not do this automatically)
   for ft, parser in pairs(ft_to_parser) do
     pcall(vim.treesitter.language.register, parser, ft)
   end
@@ -128,47 +160,40 @@ function M.setup()
     group = vim.api.nvim_create_augroup("lvim_treesitter", { clear = true }),
     callback = function(ev)
       local buf = ev.buf
-      local lang = vim.treesitter.language.get_lang(ev.match) or ev.match
+      local ft = ev.match
+      local lang = vim.treesitter.language.get_lang(ft) or ft
 
-      -- Check if a parser exists for this language
-      local parser_ok = pcall(vim.treesitter.language.inspect, lang)
-
-      -- Auto-install: if parser not present but available, install then re-trigger
-      if not parser_ok then
-        if
-          lvim.builtin.treesitter.auto_install
-          and check_tree_sitter_cli()
-          and available_parsers[lang]
-          and not auto_installing[lang]
-        then
-          auto_installing[lang] = true
-          Log:debug("auto-installing treesitter parser for: " .. lang)
-          local task = nvim_treesitter.install { lang }
-          if task and task.wait then
-            task:wait(60000)
-            -- Re-trigger FileType so highlighting activates after install
-            vim.schedule(function()
-              vim.api.nvim_exec_autocmds("FileType", { buffer = buf })
-            end)
-          end
-        end
+      -- Try to start treesitter highlighting
+      if try_enable_treesitter(buf, lang, highlight_cfg, indent_cfg, is_disabled) then
         return
       end
 
-      -- Check for bigfile disable
-      local bigfile_ok, big_file_detected = pcall(vim.api.nvim_buf_get_var, buf, "bigfile_disable_treesitter")
-      if bigfile_ok and big_file_detected then
-        return
+      -- Parser not available — try auto-install in background
+      if
+        lvim.builtin.treesitter.auto_install
+        and check_tree_sitter_cli()
+        and available_parsers[lang]
+        and not auto_installing[lang]
+      then
+        auto_installing[lang] = true
+        Log:debug("auto-installing treesitter parser for: " .. lang)
+        nvim_treesitter.install({ lang }):on("finish", function()
+          -- Re-trigger FileType on all buffers with this filetype
+          vim.schedule(function()
+            for _, b in ipairs(vim.api.nvim_list_bufs()) do
+              if vim.api.nvim_buf_is_loaded(b) and vim.bo[b].filetype == ft then
+                vim.api.nvim_exec_autocmds("FileType", { buffer = b })
+              end
+            end
+          end)
+        end)
       end
 
-      -- Enable highlighting
-      if highlight_cfg.enable and not is_disabled(highlight_cfg, lang, buf) then
-        pcall(vim.treesitter.start, buf, lang)
-      end
-
-      -- Enable indentation
-      if indent_cfg.enable and not is_disabled(indent_cfg, lang, buf) then
-        vim.bo[buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+      -- Fall back to vim syntax highlighting using the alias if available
+      -- (provides immediate coloring while the parser installs)
+      local syntax_fallback = ft_to_parser[ft]
+      if syntax_fallback then
+        vim.bo[buf].syntax = syntax_fallback
       end
     end,
   })
