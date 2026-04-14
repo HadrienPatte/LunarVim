@@ -65,7 +65,7 @@ function M.setup()
     if vim.fn.executable "tree-sitter" == 1 then
       nvim_treesitter.install(parsers)
     else
-      Log:warn "tree-sitter CLI not found, skipping parser installation. Install it with: brew install tree-sitter"
+      Log:warn "tree-sitter CLI not found, skipping parser installation. Install it with: brew install tree-sitter-cli"
     end
   end
 
