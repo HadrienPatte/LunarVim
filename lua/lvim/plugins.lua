@@ -114,7 +114,7 @@ local core_plugins = {
     ft = "lua",
     opts = {
       library = {
-        { path = "${3rd}/luv/library", words = { "vim%.uv", "vim%.loop" } },
+        { path = "${3rd}/luv/library", words = { "vim%.uv" } },
       },
     },
   },
@@ -133,8 +133,7 @@ local core_plugins = {
   -- Treesitter
   {
     "nvim-treesitter/nvim-treesitter",
-    branch = "master",
-    -- run = ":TSUpdate",
+    build = ":TSUpdate",
     config = function()
       local utils = require "lvim.utils"
       local path = utils.join_paths(get_runtime_dir(), "site", "pack", "lazy", "opt", "nvim-treesitter")
@@ -145,10 +144,8 @@ local core_plugins = {
       "TSInstall",
       "TSUninstall",
       "TSUpdate",
-      "TSUpdateSync",
-      "TSInstallInfo",
-      "TSInstallSync",
       "TSInstallFromGrammar",
+      "TSLog",
     },
     event = "User FileOpened",
   },

@@ -3,7 +3,7 @@ local M = {}
 local Log = require "lvim.core.log"
 local fmt = string.format
 local lvim_lsp_utils = require "lvim.lsp.utils"
-local is_windows = (vim.uv or vim.loop).os_uname().version:match "Windows"
+local is_windows = vim.uv.os_uname().version:match "Windows"
 
 local function resolve_mason_config(server_name)
   local found, mason_config = pcall(require, "mason-lspconfig.server_configurations." .. server_name)
@@ -91,7 +91,7 @@ end
 ---@param server_name string name of the language server
 ---@param user_config table? when available it will take predence over any default configurations
 function M.setup(server_name, user_config)
-  vim.validate { name = { server_name, "string" } }
+  vim.validate("name", server_name, "string")
   user_config = user_config or {}
 
   if lvim_lsp_utils.is_client_active(server_name) or client_is_configured(server_name) then

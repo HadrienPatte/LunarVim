@@ -1,5 +1,5 @@
 local M = {}
-local uv = vim.uv or vim.loop
+local uv = vim.uv
 
 -- recursive Print (structure, limit, separator)
 local function r_inspect_settings(structure, limit, separator)

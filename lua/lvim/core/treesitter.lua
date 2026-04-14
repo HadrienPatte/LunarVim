@@ -5,44 +5,28 @@ function M.config()
   lvim.builtin.treesitter = {
     on_config_done = nil,
 
-    -- A list of parser names, or "all"
+    -- A list of parser names to ensure are installed
     ensure_installed = { "comment", "markdown_inline", "regex" },
 
-    -- List of parsers to ignore installing (for "all")
-    ignore_install = {},
-
-    -- A directory to install the parsers into.
-    -- By default parsers are installed to either the package dir, or the "site" dir.
-    -- If a custom path is used (not nil) it must be added to the runtimepath.
-    parser_install_dir = nil,
-
-    -- Install parsers synchronously (only applied to `ensure_installed`)
-    sync_install = false,
-
-    -- Automatically install missing parsers when entering buffer
-    auto_install = true,
-
-    matchup = {
-      enable = false, -- mandatory, false will disable the whole extension
-      -- disable = { "c", "ruby" },  -- optional, list of language that will be disabled
-    },
+    -- Enable treesitter-based highlighting
     highlight = {
-      enable = true, -- false will disable the whole extension
-      additional_vim_regex_highlighting = false,
-      disable = function(lang, buf)
-        if vim.tbl_contains({ "latex" }, lang) then
-          return true
-        end
-
-        local status_ok, big_file_detected = pcall(vim.api.nvim_buf_get_var, buf, "bigfile_disable_treesitter")
-        return status_ok and big_file_detected
-      end,
+      enable = true,
+      -- Languages to disable highlighting for
+      disable = { "latex" },
     },
+
+    -- Enable treesitter-based indentation (experimental)
+    indent = {
+      enable = true,
+      -- Languages to disable indentation for
+      disable = { "yaml", "python" },
+    },
+
+    -- Context commentstring configuration
     context_commentstring = {
       enable = true,
       enable_autocmd = false,
       config = {
-        -- Languages that have a single comment style
         typescript = "// %s",
         css = "/* %s */",
         scss = "/* %s */",
@@ -51,46 +35,6 @@ function M.config()
         vue = "<!-- %s -->",
         json = "",
       },
-    },
-    indent = { enable = true, disable = { "yaml", "python" } },
-    autotag = { enable = false },
-    textobjects = {
-      swap = {
-        enable = false,
-        -- swap_next = textobj_swap_keymaps,
-      },
-      -- move = textobj_move_keymaps,
-      select = {
-        enable = false,
-        -- keymaps = textobj_sel_keymaps,
-      },
-    },
-    textsubjects = {
-      enable = false,
-      keymaps = { ["."] = "textsubjects-smart", [";"] = "textsubjects-big" },
-    },
-    playground = {
-      enable = false,
-      disable = {},
-      updatetime = 25, -- Debounced time for highlighting nodes in the playground from source code
-      persist_queries = false, -- Whether the query persists across vim sessions
-      keybindings = {
-        toggle_query_editor = "o",
-        toggle_hl_groups = "i",
-        toggle_injected_languages = "t",
-        toggle_anonymous_nodes = "a",
-        toggle_language_display = "I",
-        focus_language = "f",
-        unfocus_language = "F",
-        update = "R",
-        goto_node = "<cr>",
-        show_help = "?",
-      },
-    },
-    rainbow = {
-      enable = false,
-      extended_mode = true, -- Highlight also non-parentheses delimiters, boolean or table: lang -> boolean
-      max_file_lines = 1000, -- Do not enable for files with more than 1000 lines, int
     },
   }
 end
@@ -102,31 +46,70 @@ function M.setup()
     return
   end
 
-  local ts_status_ok, treesitter_configs = pcall(require, "nvim-treesitter.configs")
-  if not ts_status_ok then
-    Log:error "Failed to load nvim-treesitter.configs"
+  local ts_ok, nvim_treesitter = pcall(require, "nvim-treesitter")
+  if not ts_ok then
+    Log:error "Failed to load nvim-treesitter"
     return
   end
 
+  -- Setup context commentstring if available
   local status_ok, ts_context_commentstring = pcall(require, "ts_context_commentstring")
   if status_ok then
     ts_context_commentstring.setup(lvim.builtin.treesitter.context_commentstring or {})
   end
 
-  local opts = vim.deepcopy(lvim.builtin.treesitter)
-  opts.context_commentstring = nil
-
-  treesitter_configs.setup(opts)
-
-  if lvim.builtin.treesitter.on_config_done then
-    lvim.builtin.treesitter.on_config_done(treesitter_configs)
+  -- Install requested parsers (async, runs in background)
+  local parsers = lvim.builtin.treesitter.ensure_installed
+  if parsers and #parsers > 0 then
+    nvim_treesitter.install(parsers)
   end
 
-  -- handle deprecated API, https://github.com/windwp/nvim-autopairs/pull/324
-  local ts_utils_ok, ts_utils = pcall(require, "nvim-treesitter.ts_utils")
-  if ts_utils_ok and vim.treesitter.is_in_node_range then
-    ts_utils.is_in_node_range = vim.treesitter.is_in_node_range
-    ts_utils.get_node_range = vim.treesitter.get_node_range
+  -- Enable highlighting and indentation per-filetype via autocmd
+  local highlight_cfg = lvim.builtin.treesitter.highlight or {}
+  local indent_cfg = lvim.builtin.treesitter.indent or {}
+
+  local function is_disabled(cfg, lang, buf)
+    local disable = cfg.disable
+    if type(disable) == "table" then
+      return vim.tbl_contains(disable, lang)
+    elseif type(disable) == "function" then
+      return disable(lang, buf)
+    end
+    return false
+  end
+
+  vim.api.nvim_create_autocmd("FileType", {
+    group = vim.api.nvim_create_augroup("lvim_treesitter", { clear = true }),
+    callback = function(ev)
+      local buf = ev.buf
+      local lang = vim.treesitter.language.get_lang(ev.match) or ev.match
+
+      -- Check if a parser exists for this language
+      local parser_ok = pcall(vim.treesitter.language.inspect, lang)
+      if not parser_ok then
+        return
+      end
+
+      -- Check for bigfile disable
+      local bigfile_ok, big_file_detected = pcall(vim.api.nvim_buf_get_var, buf, "bigfile_disable_treesitter")
+      if bigfile_ok and big_file_detected then
+        return
+      end
+
+      -- Enable highlighting
+      if highlight_cfg.enable and not is_disabled(highlight_cfg, lang, buf) then
+        pcall(vim.treesitter.start, buf, lang)
+      end
+
+      -- Enable indentation
+      if indent_cfg.enable and not is_disabled(indent_cfg, lang, buf) then
+        vim.bo[buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+      end
+    end,
+  })
+
+  if lvim.builtin.treesitter.on_config_done then
+    lvim.builtin.treesitter.on_config_done(nvim_treesitter)
   end
 end
 

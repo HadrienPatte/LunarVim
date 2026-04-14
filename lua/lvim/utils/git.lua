@@ -61,7 +61,7 @@ end
 function M.update_base_lvim()
   Log:info "Checking for updates"
 
-  if not (vim.uv or vim.loop).fs_access(get_lvim_base_dir(), "w") then
+  if not vim.uv.fs_access(get_lvim_base_dir(), "w") then
     Log:warn(fmt("Lunarvim update aborted! cannot write to %s", get_lvim_base_dir()))
     return
   end

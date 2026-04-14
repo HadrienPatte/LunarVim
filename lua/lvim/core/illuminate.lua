@@ -6,11 +6,11 @@ M.config = function()
     on_config_done = nil,
     options = {
       -- providers: provider used to get references in the buffer, ordered by priority
-      -- NOTE: treesitter provider disabled on nvim 0.12+ due to nvim-treesitter/locals.lua
-      -- incompatibility with newer treesitter node APIs
-      providers = vim.fn.has "nvim-0.12" == 1
-        and { "lsp", "regex" }
-        or { "lsp", "treesitter", "regex" },
+      providers = {
+        "lsp",
+        "treesitter",
+        "regex",
+      },
       -- delay: delay in milliseconds
       delay = 120,
       -- filetype_overrides: filetype specific overrides.

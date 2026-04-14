@@ -1,26 +1,5 @@
 local M = {}
 
-local lsp_log_path = vim.lsp.log and vim.lsp.log.get_filename and vim.lsp.log.get_filename()
-  or vim.lsp.get_log_path and vim.lsp.get_log_path()
-  or ""
-
--- version-compatible diagnostic jump
-local function diag_goto_next()
-  if vim.diagnostic.jump then
-    vim.diagnostic.jump { count = 1, float = true }
-  else
-    vim.diagnostic.goto_next()
-  end
-end
-
-local function diag_goto_prev()
-  if vim.diagnostic.jump then
-    vim.diagnostic.jump { count = -1, float = true }
-  else
-    vim.diagnostic.goto_prev()
-  end
-end
-
 M.config = function()
   lvim.builtin.which_key = {
     ---@usage disable which-key completely [not recommended]
@@ -179,8 +158,20 @@ M.config = function()
       { "<leader>lf", "<cmd>lua require('lvim.lsp.utils').format()<cr>", desc = "Format" },
       { "<leader>li", "<cmd>LspInfo<cr>", desc = "Info" },
       { "<leader>lI", "<cmd>Mason<cr>", desc = "Mason Info" },
-      { "<leader>lj", diag_goto_next, desc = "Next Diagnostic" },
-      { "<leader>lk", diag_goto_prev, desc = "Prev Diagnostic" },
+      {
+        "<leader>lj",
+        function()
+          vim.diagnostic.jump { count = 1, float = true }
+        end,
+        desc = "Next Diagnostic",
+      },
+      {
+        "<leader>lk",
+        function()
+          vim.diagnostic.jump { count = -1, float = true }
+        end,
+        desc = "Prev Diagnostic",
+      },
       { "<leader>ll", "<cmd>lua vim.lsp.codelens.run()<cr>", desc = "CodeLens Action" },
       { "<leader>lq", "<cmd>lua vim.diagnostic.setloclist()<cr>", desc = "Quickfix" },
       { "<leader>lr", "<cmd>lua vim.lsp.buf.rename()<cr>", desc = "Rename" },
@@ -231,20 +222,14 @@ M.config = function()
       {
         "<leader>Lll",
         function()
-          local path = vim.lsp.log and vim.lsp.log.get_filename and vim.lsp.log.get_filename()
-            or vim.lsp.get_log_path and vim.lsp.get_log_path()
-            or ""
-          require("lvim.core.terminal").toggle_log_view(path)
+          require("lvim.core.terminal").toggle_log_view(vim.lsp.log.get_filename())
         end,
         desc = "view lsp log",
       },
       {
         "<leader>LlL",
         function()
-          local path = vim.lsp.log and vim.lsp.log.get_filename and vim.lsp.log.get_filename()
-            or vim.lsp.get_log_path and vim.lsp.get_log_path()
-            or ""
-          vim.fn.execute("edit " .. path)
+          vim.fn.execute("edit " .. vim.lsp.log.get_filename())
         end,
         desc = "Open the LSP logfile",
       },
@@ -279,7 +264,7 @@ M.config = function()
 
       -- Treesitter
       { "<leader>T", group = "Treesitter" },
-      { "<leader>Ti", ":TSConfigInfo<cr>", desc = "Info" },
+      { "<leader>Ti", "<cmd>TSLog<cr>", desc = "Log" },
     },
   }
 end

@@ -90,7 +90,7 @@ local function add_to_path(append)
   if vim.env.PATH:match(p) then
     return
   end
-  local string_separator = (vim.uv or vim.loop).os_uname().version:match "Windows" and ";" or ":"
+  local string_separator = vim.uv.os_uname().version:match "Windows" and ";" or ":"
   if append then
     vim.env.PATH = vim.env.PATH .. string_separator .. p
   else
