@@ -173,6 +173,14 @@ function M.setup()
     end,
   })
 
+  -- Re-trigger FileType for all loaded buffers so that buffers opened before
+  -- treesitter setup (e.g. the initial file) get highlighting applied
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype ~= "" then
+      vim.api.nvim_exec_autocmds("FileType", { buffer = buf })
+    end
+  end
+
   if lvim.builtin.treesitter.on_config_done then
     lvim.builtin.treesitter.on_config_done(nvim_treesitter)
   end
