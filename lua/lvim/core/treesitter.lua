@@ -177,16 +177,19 @@ function M.setup()
       then
         auto_installing[lang] = true
         Log:debug("auto-installing treesitter parser for: " .. lang)
-        nvim_treesitter.install({ lang }):on("finish", function()
-          -- Re-trigger FileType on all buffers with this filetype
-          vim.schedule(function()
-            for _, b in ipairs(vim.api.nvim_list_bufs()) do
-              if vim.api.nvim_buf_is_loaded(b) and vim.bo[b].filetype == ft then
-                vim.api.nvim_exec_autocmds("FileType", { buffer = b })
+        local task = nvim_treesitter.install { lang }
+        if task and task.await then
+          task:await(function()
+            -- Re-trigger FileType on all buffers with this filetype
+            vim.schedule(function()
+              for _, b in ipairs(vim.api.nvim_list_bufs()) do
+                if vim.api.nvim_buf_is_loaded(b) and vim.bo[b].filetype == ft then
+                  vim.api.nvim_exec_autocmds("FileType", { buffer = b })
+                end
               end
-            end
+            end)
           end)
-        end)
+        end
       end
 
       -- Fall back to vim syntax highlighting using the alias if available
