@@ -82,7 +82,7 @@ function M.setup_document_highlight(client, bufnr)
     return
   end
   local status_ok, highlight_supported = pcall(function()
-    return client.supports_method "textDocument/documentHighlight"
+    return client:supports_method("textDocument/documentHighlight")
   end)
   if not status_ok or not highlight_supported then
     return
@@ -115,7 +115,7 @@ end
 
 function M.setup_document_symbols(client, bufnr)
   vim.g.navic_silence = false -- can be set to true to suppress error
-  local symbols_supported = client.supports_method "textDocument/documentSymbol"
+  local symbols_supported = client:supports_method("textDocument/documentSymbol")
   if not symbols_supported then
     Log:debug("skipping setup for document_symbols, method not supported by " .. client.name)
     return
@@ -128,7 +128,7 @@ end
 
 function M.setup_codelens_refresh(client, bufnr)
   local status_ok, codelens_supported = pcall(function()
-    return client.supports_method "textDocument/codeLens"
+    return client:supports_method("textDocument/codeLens")
   end)
   if not status_ok or not codelens_supported then
     return
@@ -167,7 +167,7 @@ function M.format_filter(client)
 
   if #available_formatters > 0 then
     return client.name == "null-ls"
-  elseif client.supports_method "textDocument/formatting" then
+  elseif client:supports_method("textDocument/formatting") then
     return true
   else
     return false
