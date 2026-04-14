@@ -69,6 +69,22 @@ function M.setup()
     end
   end
 
+  -- Register common filetype aliases so treesitter can highlight them
+  -- using a related parser (the new nvim-treesitter main branch does not
+  -- do this automatically like the old master branch did)
+  local ft_to_parser = {
+    helm = "yaml",
+    dotenv = "bash",
+    zsh = "bash",
+    keymap = "devicetree",
+    json5 = "json",
+    jsonc = "json",
+    terraform = "hcl",
+  }
+  for ft, parser in pairs(ft_to_parser) do
+    pcall(vim.treesitter.language.register, parser, ft)
+  end
+
   -- Enable highlighting and indentation per-filetype via autocmd
   local highlight_cfg = lvim.builtin.treesitter.highlight or {}
   local indent_cfg = lvim.builtin.treesitter.indent or {}
