@@ -1,12 +1,17 @@
 local M = {}
 local Log = require "lvim.core.log"
 
+local has_tree_sitter_cli = nil
+
 function M.config()
   lvim.builtin.treesitter = {
     on_config_done = nil,
 
     -- A list of parser names to ensure are installed
     ensure_installed = { "comment", "markdown_inline", "regex" },
+
+    -- Automatically install missing parsers when entering buffer
+    auto_install = true,
 
     -- Enable treesitter-based highlighting
     highlight = {
@@ -39,6 +44,14 @@ function M.config()
   }
 end
 
+--- Check if the tree-sitter CLI is available (cached)
+local function check_tree_sitter_cli()
+  if has_tree_sitter_cli == nil then
+    has_tree_sitter_cli = vim.fn.executable "tree-sitter" == 1
+  end
+  return has_tree_sitter_cli
+end
+
 function M.setup()
   -- avoid running in headless mode since it's harder to detect failures
   if #vim.api.nvim_list_uis() == 0 then
@@ -62,7 +75,7 @@ function M.setup()
   -- Requires the tree-sitter CLI (>= 0.26.1) to compile parsers
   local parsers = lvim.builtin.treesitter.ensure_installed
   if parsers and #parsers > 0 then
-    if vim.fn.executable "tree-sitter" == 1 then
+    if check_tree_sitter_cli() then
       nvim_treesitter.install(parsers)
     else
       Log:warn "tree-sitter CLI not found, skipping parser installation. Install it with: brew install tree-sitter-cli"
@@ -85,6 +98,15 @@ function M.setup()
     pcall(vim.treesitter.language.register, parser, ft)
   end
 
+  -- Build a set of available parsers for auto-install lookups
+  local available_parsers = {}
+  local get_available_ok, available_list = pcall(nvim_treesitter.get_available)
+  if get_available_ok and available_list then
+    for _, p in ipairs(available_list) do
+      available_parsers[p] = true
+    end
+  end
+
   -- Enable highlighting and indentation per-filetype via autocmd
   local highlight_cfg = lvim.builtin.treesitter.highlight or {}
   local indent_cfg = lvim.builtin.treesitter.indent or {}
@@ -99,6 +121,9 @@ function M.setup()
     return false
   end
 
+  -- Track parsers we've already kicked off auto-install for
+  local auto_installing = {}
+
   vim.api.nvim_create_autocmd("FileType", {
     group = vim.api.nvim_create_augroup("lvim_treesitter", { clear = true }),
     callback = function(ev)
@@ -107,7 +132,26 @@ function M.setup()
 
       -- Check if a parser exists for this language
       local parser_ok = pcall(vim.treesitter.language.inspect, lang)
+
+      -- Auto-install: if parser not present but available, install then re-trigger
       if not parser_ok then
+        if
+          lvim.builtin.treesitter.auto_install
+          and check_tree_sitter_cli()
+          and available_parsers[lang]
+          and not auto_installing[lang]
+        then
+          auto_installing[lang] = true
+          Log:debug("auto-installing treesitter parser for: " .. lang)
+          local task = nvim_treesitter.install { lang }
+          if task and task.wait then
+            task:wait(60000)
+            -- Re-trigger FileType so highlighting activates after install
+            vim.schedule(function()
+              vim.api.nvim_exec_autocmds("FileType", { buffer = buf })
+            end)
+          end
+        end
         return
       end
 
