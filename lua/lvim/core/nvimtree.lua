@@ -264,10 +264,6 @@ function M.config()
           watcher = false,
         },
       },
-      system_open = {
-        cmd = nil,
-        args = {},
-      },
     },
   }
 end
@@ -324,9 +320,9 @@ function M.setup()
   -- Implicitly update nvim-tree when project module is active
   if lvim.builtin.project.active then
     lvim.builtin.nvimtree.setup.respect_buf_cwd = true
-    lvim.builtin.nvimtree.setup.update_cwd = true
+    lvim.builtin.nvimtree.setup.sync_root_with_cwd = true
     lvim.builtin.nvimtree.setup.update_focused_file.enable = true
-    lvim.builtin.nvimtree.setup.update_focused_file.update_cwd = true
+    lvim.builtin.nvimtree.setup.update_focused_file.update_root.enable = true
   end
 
   -- Add useful keymaps

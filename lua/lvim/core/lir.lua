@@ -6,7 +6,7 @@ M.config = function()
   local clipboard_actions = utils.require_on_exported_call "lir.clipboard.actions"
 
   lvim.builtin.lir = {
-    active = true,
+    active = false,
     on_config_done = nil,
     icon = "",
     show_hidden_files = false,
