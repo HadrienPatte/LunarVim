@@ -6,24 +6,19 @@ local lvim_lsp_utils = require "lvim.lsp.utils"
 local is_windows = vim.uv.os_uname().version:match "Windows"
 
 local function resolve_mason_config(server_name)
-  local found, mason_config = pcall(require, "mason-lspconfig.server_configurations." .. server_name)
+  local found, mason_config = pcall(require, "mason-lspconfig.lsp." .. server_name)
   if not found then
     Log:debug(fmt("mason configuration not found for %s", server_name))
     return {}
   end
-  local server_mapping = require "mason-lspconfig.mappings.server"
-  local path = require "mason-core.path"
-  local pkg_name = server_mapping.lspconfig_to_package[server_name]
-  local install_dir = path.package_prefix(pkg_name)
-  local conf = mason_config(install_dir)
-  if is_windows and conf.cmd and conf.cmd[1] then
-    local exepath = vim.fn.exepath(conf.cmd[1])
+  if is_windows and mason_config.cmd and mason_config.cmd[1] then
+    local exepath = vim.fn.exepath(mason_config.cmd[1])
     if exepath ~= "" then
-      conf.cmd[1] = exepath
+      mason_config.cmd[1] = exepath
     end
   end
-  Log:debug(fmt("resolved mason configuration for %s, got %s", server_name, vim.inspect(conf)))
-  return conf or {}
+  Log:debug(fmt("resolved mason configuration for %s, got %s", server_name, vim.inspect(mason_config)))
+  return mason_config or {}
 end
 
 ---Resolve the configuration for a server by merging with the default config
@@ -52,7 +47,15 @@ end
 -- manually start the server and don't wait for the usual filetype trigger from lspconfig
 local function buf_try_add(server_name, bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
-  require("lspconfig")[server_name].manager:try_add_wrapper(bufnr)
+  local lspconfig_server = require("lspconfig")[server_name]
+  if lspconfig_server.manager and lspconfig_server.manager.try_add_wrapper then
+    lspconfig_server.manager:try_add_wrapper(bufnr)
+  elseif lspconfig_server.manager and lspconfig_server.manager.try_add then
+    lspconfig_server.manager:try_add(bufnr)
+  else
+    -- Trigger FileType event to let lspconfig attach
+    vim.api.nvim_exec_autocmds("FileType", { buffer = bufnr })
+  end
 end
 
 -- check if the manager autocomd has already been configured since some servers can take a while to initialize
@@ -74,8 +77,11 @@ local function launch_server(server_name, config)
   pcall(function()
     local command = config.cmd
       or (function()
-        local default_config = require("lspconfig.server_configurations." .. server_name).default_config
-        return default_config.cmd
+        local ok, server_config = pcall(require, "lspconfig.configs." .. server_name)
+        if ok and server_config and server_config.default_config then
+          return server_config.default_config.cmd
+        end
+        return nil
       end)()
     -- some servers have dynamic commands defined with on_new_config
     if type(command) == "table" and type(command[1]) == "string" and vim.fn.executable(command[1]) ~= 1 then
@@ -98,9 +104,16 @@ function M.setup(server_name, user_config)
     return
   end
 
-  local server_mapping = require "mason-lspconfig.mappings.server"
-  local registry = require "mason-registry"
+  local mason_mappings_ok, mason_mappings = pcall(require, "mason-lspconfig.mappings")
+  local registry_ok, registry = pcall(require, "mason-registry")
 
+  if not mason_mappings_ok or not registry_ok then
+    local config = resolve_config(server_name, user_config)
+    launch_server(server_name, config)
+    return
+  end
+
+  local server_mapping = mason_mappings.get_mason_map()
   local pkg_name = server_mapping.lspconfig_to_package[server_name]
   if not pkg_name then
     local config = resolve_config(server_name, user_config)

@@ -43,12 +43,12 @@ end
 ---@param server_name string can be any server supported by nvim-lsp-installer
 ---@return string[] supported filestypes as a list of strings
 function M.get_supported_filetypes(server_name)
-  local status_ok, config = pcall(require, ("lspconfig.server_configurations.%s"):format(server_name))
+  local status_ok, config = pcall(require, ("lspconfig.configs.%s"):format(server_name))
   if not status_ok then
     return {}
   end
 
-  return config.default_config.filetypes or {}
+  return (config.default_config and config.default_config.filetypes) or config.filetypes or {}
 end
 
 ---Get supported servers per filetype
@@ -68,11 +68,12 @@ end
 ---Get all supported filetypes by nvim-lsp-installer
 ---@return string[] supported filestypes as a list of strings
 function M.get_all_supported_filetypes()
-  local status_ok, filetype_server_map = pcall(require, "mason-lspconfig.mappings.filetype")
+  local status_ok, mason_mappings = pcall(require, "mason-lspconfig.mappings")
   if not status_ok then
     return {}
   end
-  return vim.tbl_keys(filetype_server_map or {})
+  local filetype_map = mason_mappings.get_filetype_map()
+  return vim.tbl_keys(filetype_map or {})
 end
 
 function M.setup_document_highlight(client, bufnr)

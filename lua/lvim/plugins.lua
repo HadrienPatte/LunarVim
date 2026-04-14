@@ -10,11 +10,13 @@ local core_plugins = {
     "williamboman/mason-lspconfig.nvim",
     cmd = { "LspInstall", "LspUninstall" },
     config = function()
-      require("mason-lspconfig").setup(lvim.lsp.installer.setup)
-
-      -- automatic_installation is handled by lsp-manager
-      local settings = require "mason-lspconfig.settings"
-      settings.current.automatic_installation = false
+      -- Map the old lvim.lsp.installer.setup format to the new mason-lspconfig settings
+      local installer_setup = lvim.lsp.installer.setup or {}
+      require("mason-lspconfig").setup {
+        ensure_installed = installer_setup.ensure_installed or {},
+        -- Disable automatic_enable — LunarVim's lsp-manager handles server setup
+        automatic_enable = false,
+      }
     end,
     lazy = true,
     event = "User FileOpened",
