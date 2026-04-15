@@ -201,49 +201,6 @@ function M.setup()
     end,
   })
 
-  -- Enable treesitter on buffers that were loaded before this setup ran.
-  -- During plugin loading, other events can clear highlighting, so we use
-  -- VimEnter (fires once after all startup is complete) as the safe point.
-  if vim.v.vim_did_enter == 1 then
-    -- Already past VimEnter (e.g. lazy-loaded after startup), apply now
-    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-      if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype ~= "" then
-        local ft = vim.bo[buf].filetype
-        local lang = vim.treesitter.language.get_lang(ft) or ft
-        if not try_enable_treesitter(buf, lang, highlight_cfg, indent_cfg, is_disabled) then
-          local syntax_fallback = ft_to_parser[ft]
-          if syntax_fallback then
-            vim.bo[buf].syntax = syntax_fallback
-          end
-        end
-      end
-    end
-  else
-    vim.api.nvim_create_autocmd("UIEnter", {
-      once = true,
-      callback = function()
-        for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-          if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype ~= "" then
-            local ft = vim.bo[buf].filetype
-            local lang = vim.treesitter.language.get_lang(ft) or ft
-            local parser_ok = pcall(vim.treesitter.language.inspect, lang)
-            if parser_ok then
-              pcall(vim.treesitter.start, buf, lang)
-              if indent_cfg.enable and not is_disabled(indent_cfg, lang, buf) then
-                vim.bo[buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
-              end
-            else
-              local syntax_fallback = ft_to_parser[ft]
-              if syntax_fallback then
-                vim.bo[buf].syntax = syntax_fallback
-              end
-            end
-          end
-        end
-      end,
-    })
-  end
-
   if lvim.builtin.treesitter.on_config_done then
     lvim.builtin.treesitter.on_config_done(nvim_treesitter)
   end
