@@ -137,8 +137,11 @@ local core_plugins = {
     build = ":TSUpdate",
     config = function()
       local utils = require "lvim.utils"
-      local path = utils.join_paths(get_runtime_dir(), "site", "pack", "lazy", "opt", "nvim-treesitter")
-      vim.opt.rtp:prepend(path) -- treesitter needs to be before nvim's runtime in rtp
+      -- The new nvim-treesitter main branch puts queries under runtime/queries/,
+      -- so we need to add the runtime/ subdirectory to rtp for neovim to find them.
+      local ts_root = utils.join_paths(get_runtime_dir(), "site", "pack", "lazy", "opt", "nvim-treesitter")
+      vim.opt.rtp:prepend(utils.join_paths(ts_root, "runtime"))
+      vim.opt.rtp:prepend(ts_root)
       require("lvim.core.treesitter").setup()
     end,
     cmd = {
